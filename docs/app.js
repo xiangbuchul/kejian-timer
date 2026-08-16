@@ -481,7 +481,31 @@ async function openFloatWindow() {
   const taskType = document.getElementById('taskType')?.value || '';
   const content = document.getElementById('taskContent')?.value || '';
   await invoke('save_float_task', { task: { taskType, content } });
-  showInlineFloat();
+  if (!await openPipWindow()) {
+    showInlineFloat();
+  }
+}
+
+async function openPipWindow() {
+  if (!('documentPictureInPicture' in window)) {
+    console.log('PiP not supported');
+    return false;
+  }
+  try {
+    const pipWindow = await documentPictureInPicture.requestWindow({
+      width: 260,
+      height: 180
+    });
+    // Load pip.html into PiP window
+    const response = await fetch('pip.html');
+    const html = await response.text();
+    pipWindow.document.write(html);
+    pipWindow.document.close();
+    return true;
+  } catch (e) {
+    console.error('PiP failed', e);
+    return false;
+  }
 }
 
 async function closeFloatWindow() {

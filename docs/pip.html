@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>刻间计时器</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: rgba(255,255,255,0.98);
+      color: #1f2937;
+      padding: 12px;
+      min-width: 220px;
+      user-select: none;
+    }
+    .pip-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .pip-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #6b7280;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 6px;
+    }
+    .pip-task {
+      font-size: 14px;
+      font-weight: 600;
+      color: #111827;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pip-type {
+      font-size: 11px;
+      color: #6b7280;
+    }
+    .pip-time {
+      font-size: 28px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: #111827;
+      text-align: center;
+      padding: 8px 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    .pip-time.running { color: #059669; }
+    .pip-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .pip-btn {
+      flex: 1;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .pip-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .pip-btn-start { background: #059669; color: #fff; }
+    .pip-btn-stop { background: #ef4444; color: #fff; }
+    .pip-status {
+      font-size: 11px;
+      text-align: center;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+  <div class="pip-container">
+    <div class="pip-header">
+      <span>刻间计时器</span>
+      <span class="pip-status" id="status">就绪</span>
+    </div>
+    <div class="pip-type" id="pipType">--</div>
+    <div class="pip-task" id="pipTask">点击开始计时</div>
+    <div class="pip-time" id="pipTime">00:00:00</div>
+    <div class="pip-actions">
+      <button class="pip-btn pip-btn-start" id="pipStart">开始</button>
+      <button class="pip-btn pip-btn-stop" id="pipStop" disabled>结束</button>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'kejian-timer-data';
+    const TIMER_STATE_KEY = 'kejian-timer-timer-state';
+    const FLOAT_TASK_KEY = 'kejian-timer-float-task';
+
+    function getLS(k) {
+      try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch { return null; }
+    }
+    function setLS(k, v) {
+      try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
+    }
+
+    function formatClock(sec) {
+      const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+      return [h,m,s].map(x => String(x).padStart(2,'0')).join(':');
+    }
+
+    let timer = null;
+    let floatTask = getLS(FLOAT_TASK_KEY) || { taskType: '', content: '' };
+
+    function updateDisplay() {
+      const state = getLS(TIMER_STATE_KEY);
+      const elapsed = state && state.running && state.startAt
+        ? Math.floor((Date.now() - state.startAt) / 1000) + (state.elapsed || 0)
+        : (state ? state.elapsed || 0 : 0);
+      document.getElementById('pipTime').textContent = formatClock(elapsed);
+      document.getElementById('pipTime').classList.toggle('running', state && state.running);
+      document.getElementById('pipStart').disabled = state && state.running;
+      document.getElementById('pipStop').disabled = !(state && state.running);
+      document.getElementById('status').textContent = state && state.running ? '计时中' : '暂停';
+
+      const task = floatTask;
+      document.getElementById('pipType').textContent = task.taskType || '未选择';
+      document.getElementById('pipTask').textContent = task.content || task.taskType || '点击开始计时';
+    }
+
+    function startTimer() {
+      const task = floatTask;
+      if (!task.taskType) return;
+      const old = getLS(TIMER_STATE_KEY) || { elapsed: 0 };
+      const state = {
+        running: true,
+        startAt: Date.now(),
+        elapsed: old.elapsed || 0,
+        taskType: task.taskType,
+        content: task.content
+      };
+      setLS(TIMER_STATE_KEY, state);
+      updateDisplay();
+      broadcast('timer-state-updated');
+    }
+
+    function stopTimer() {
+      const state = getLS(TIMER_STATE_KEY);
+      if (!state || !state.running) return;
+      const elapsed = Math.floor((Date.now() - state.startAt) / 1000) + (state.elapsed || 0);
+      const finalState = { ...state, running: false, elapsed };
+      setLS(TIMER_STATE_KEY, finalState);
+      saveEntry(state.taskType, state.content, elapsed);
+      updateDisplay();
+      broadcast('timer-state-updated');
+    }
+
+    function saveEntry(taskType, content, seconds) {
+      const data = getLS(STORAGE_KEY) || { entries: [], types: [], settings: { edgeDock: false } };
+      const today = new Date().toISOString().slice(0,10);
+      const start = new Date(Date.now() - seconds * 1000);
+      const end = new Date();
+      const fmt = d => String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      data.entries.push({
+        id: Date.now().toString(36),
+        date: today,
+        taskType,
+        nature: '常规',
+        content,
+        startTime: fmt(start),
+        endTime: fmt(end),
+        quantity: 1,
+        unit: '项',
+        note: '',
+        createdAt: new Date().toISOString()
+      });
+      setLS(STORAGE_KEY, data);
+      broadcast('data-updated');
+    }
+
+    function broadcast(type) {
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          const bc = new BroadcastChannel('kejian-timer');
+          bc.postMessage({ type });
+          bc.close();
+        }
+      } catch (e) {}
+    }
+
+    document.getElementById('pipStart').addEventListener('click', startTimer);
+    document.getElementById('pipStop').addEventListener('click', stopTimer);
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === TIMER_STATE_KEY || e.key === FLOAT_TASK_KEY) {
+        if (e.key === FLOAT_TASK_KEY) floatTask = getLS(FLOAT_TASK_KEY) || { taskType: '', content: '' };
+        updateDisplay();
+      }
+    });
+
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('kejian-timer');
+        bc.onmessage = () => updateDisplay();
+      }
+    } catch (e) {}
+
+    setInterval(updateDisplay, 1000);
+    updateDisplay();
+  </script>
+</body>
+</html>
