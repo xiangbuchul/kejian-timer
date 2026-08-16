@@ -10,24 +10,15 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-action@stable
-        with:
-          targets: x86_64-pc-windows-msvc
-
-      - name: Install Tauri dependencies
-        run: |
-          winget install Microsoft.VisualStudio.2022.BuildTools --override "--wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
-        continue-on-error: true
 
       - name: Install Tauri CLI
-        run: cargo install tauri-cli --locked
+        run: cargo install tauri-cli --version "^2.0.0" --locked
 
       - name: Build Windows installer
         run: cargo tauri build --bundles nsis,msi
