@@ -66,3 +66,26 @@ cargo tauri build --bundles app
 - [`给同事的Windows安装说明.md`](./给同事的Windows安装说明.md)：可直接转发给同事的详细安装说明
 - [`WINDOWS_BUILD.md`](./WINDOWS_BUILD.md)：Windows 打包指南
 - [`GLOBAL_SHORTCUT_SETUP.md`](./GLOBAL_SHORTCUT_SETUP.md)：全局快捷键说明
+
+## 网页版（推荐 Windows 同事使用）
+
+如果你不想安装桌面客户端，可以直接使用网页版：
+
+```text
+https://xiangbuchul.github.io/kejian-timer/
+```
+
+网页版功能与桌面版基本一致：
+- 任务记录、任务类型管理
+- 每周汇总与周五周报
+- 可拖拽的悬浮计时面板
+- 数据保存在浏览器本地
+
+**注意**：网页版不支持全局快捷键 `Cmd+Shift+T` / `Win+Shift+T`。
+
+## 启用 GitHub Pages
+
+1. 打开仓库 Settings → Pages
+2. Source 选择 **Deploy from a branch**
+3. Branch 选择 **gh-pages** / (root)
+4. 或者使用 GitHub Actions 自动部署（已配置 `.github/workflows/pages.yml`）
