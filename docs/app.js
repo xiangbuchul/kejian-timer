@@ -26,7 +26,11 @@ const invoke = async (cmd, args = {}) => {
       return raw ? JSON.parse(raw) : null;
     }
     case 'save_timer_state': {
-      localStorage.setItem(TIMER_STATE_KEY, JSON.stringify(args.state));
+      if (args.state === null) {
+        localStorage.removeItem(TIMER_STATE_KEY);
+      } else {
+        localStorage.setItem(TIMER_STATE_KEY, JSON.stringify(args.state));
+      }
       broadcast('timer-state-updated');
       return;
     }
@@ -336,7 +340,7 @@ function updateTimerUI() {
   if (floatingTime) floatingTime.textContent = formatClock(sec);
 }
 
-function startTimer(type, content) {
+async function startTimer(type, content) {
   if (timerState.running) return;
   timerState = { running: true, startAt: Date.now(), taskType: type, content: content, interval: null };
   const activeTimer = document.getElementById('activeTimer');
@@ -353,12 +357,24 @@ function startTimer(type, content) {
   if (activeTask) activeTask.textContent = content || type;
   updateTimerUI();
   timerState.interval = setInterval(updateTimerUI, 1000);
+
+  // 同步到 localStorage，让悬浮窗也能看到计时状态
+  await invoke('save_timer_state', {
+    state: {
+      running: true,
+      startAt: timerState.startAt,
+      taskType: timerState.taskType,
+      content: timerState.content || timerState.taskType
+    }
+  });
 }
 
 async function applyPendingTimerState() {
   try {
     const pending = await invoke('get_timer_state');
-    if (!pending) return;
+    // 只处理已结束且带起止时间的临时计时结果，避免覆盖正在运行的状态
+    if (!pending || pending.running || !pending.startTime || !pending.endTime) return;
+
     document.getElementById('taskType').value = pending.taskType || appData.types[0] || '';
     document.getElementById('content').value = pending.content || '';
     document.getElementById('startTime').value = pending.startTime || '';
@@ -369,6 +385,9 @@ async function applyPendingTimerState() {
     }
     document.getElementById('note').value = pending.note || '';
     showPage('today');
+
+    // 回填后清空临时状态，防止重复填充
+    await invoke('save_timer_state', { state: null });
   } catch (e) { console.error('get_timer_state failed', e); }
 }
 
@@ -383,6 +402,7 @@ async function stopTimer() {
 
   await invoke('save_timer_state', {
     state: {
+      running: false,
       taskType: timerState.taskType,
       content: timerState.content || timerState.taskType,
       startTime,
@@ -518,7 +538,7 @@ document.getElementById('clearBtn')?.addEventListener('click', async () => {
 // ================= Float Window =================
 async function openFloatWindow() {
   const taskType = document.getElementById('taskType')?.value || '';
-  const content = document.getElementById('taskContent')?.value || '';
+  const content = document.getElementById('content')?.value || '';
   await invoke('save_float_task', { task: { taskType, content } });
   if (!await openPipWindow()) {
     showInlineFloat();
@@ -722,7 +742,10 @@ async function init() {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel('kejian-timer');
       bc.onmessage = (ev) => {
-        if (ev.data && ev.data.type === 'timer-state-updated') syncTimerFromStorage();
+        if (ev.data && ev.data.type === 'timer-state-updated') {
+          syncTimerFromStorage();
+          applyPendingTimerState();
+        }
         if (ev.data && ev.data.type === 'data-updated') renderToday();
       };
     }

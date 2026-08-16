@@ -148,34 +148,21 @@
       const state = getLS(TIMER_STATE_KEY);
       if (!state || !state.running) return;
       const elapsed = Math.floor((Date.now() - state.startAt) / 1000) + (state.elapsed || 0);
-      const finalState = { ...state, running: false, elapsed };
+      const endAt = new Date();
+      const startAt = new Date(endAt.getTime() - elapsed * 1000);
+      const fmt = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      const finalState = {
+        ...state,
+        running: false,
+        elapsed,
+        startTime: fmt(startAt),
+        endTime: fmt(endAt),
+        nature: '常规',
+        note: ''
+      };
       setLS(TIMER_STATE_KEY, finalState);
-      saveEntry(state.taskType, state.content, elapsed);
       updateDisplay();
       broadcast('timer-state-updated');
-    }
-
-    function saveEntry(taskType, content, seconds) {
-      const data = getLS(STORAGE_KEY) || { entries: [], types: [], settings: { edgeDock: false } };
-      const today = new Date().toISOString().slice(0,10);
-      const start = new Date(Date.now() - seconds * 1000);
-      const end = new Date();
-      const fmt = d => String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
-      data.entries.push({
-        id: Date.now().toString(36),
-        date: today,
-        taskType,
-        nature: '常规',
-        content,
-        startTime: fmt(start),
-        endTime: fmt(end),
-        quantity: 1,
-        unit: '项',
-        note: '',
-        createdAt: new Date().toISOString()
-      });
-      setLS(STORAGE_KEY, data);
-      broadcast('data-updated');
     }
 
     function broadcast(type) {
