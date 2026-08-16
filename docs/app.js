@@ -289,6 +289,45 @@ document.getElementById('entryForm')?.addEventListener('submit', async (e) => {
 });
 
 // ================= Timer =================
+
+function syncTimerFromStorage() {
+  const pending = (() => {
+    try {
+      const raw = localStorage.getItem(TIMER_STATE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
+  if (!pending) return;
+
+  // PiP started timer, main needs to catch up
+  if (pending.running && !timerState.running) {
+    timerState = {
+      running: true,
+      startAt: pending.startAt,
+      taskType: pending.taskType,
+      content: pending.content,
+      interval: setInterval(updateTimerUI, 1000)
+    };
+    const activeTimer = document.getElementById('activeTimer');
+    if (activeTimer) activeTimer.classList.remove('idle');
+    const activeTask = document.getElementById('activeTask');
+    if (activeTask) activeTask.textContent = pending.content || pending.taskType;
+  }
+
+  // PiP stopped timer, main needs to reset
+  if (!pending.running && timerState.running) {
+    clearInterval(timerState.interval);
+    timerState = { running: false, startAt: null, taskType: '', content: '', interval: null };
+    const activeTimer = document.getElementById('activeTimer');
+    if (activeTimer) activeTimer.classList.add('idle');
+    const activeTask = document.getElementById('activeTask');
+    if (activeTask) activeTask.textContent = '未开始';
+    const activeTime = document.getElementById('activeTime');
+    if (activeTime) activeTime.textContent = '00:00:00';
+    renderToday();
+  }
+}
+
 function updateTimerUI() {
   const sec = timerState.running ? Math.floor((Date.now() - timerState.startAt) / 1000) : 0;
   const activeTime = document.getElementById('activeTime');
@@ -672,6 +711,22 @@ async function init() {
 
   await applyPendingTimerState();
   window.addEventListener('focus', applyPendingTimerState);
+
+  // Sync timer state from PiP / other tabs
+  setInterval(syncTimerFromStorage, 1000);
+  window.addEventListener('storage', (e) => {
+    if (e.key === TIMER_STATE_KEY) syncTimerFromStorage();
+    if (e.key === STORAGE_KEY) renderToday();
+  });
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel('kejian-timer');
+      bc.onmessage = (ev) => {
+        if (ev.data && ev.data.type === 'timer-state-updated') syncTimerFromStorage();
+        if (ev.data && ev.data.type === 'data-updated') renderToday();
+      };
+    }
+  } catch (e) {}
 
   showPage('today');
 }
