@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# Tauri generated files
+/src-tauri/gen/schemas
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build artifacts
+*.app.zip
+*.exe
+*.msi
+*.dmg
