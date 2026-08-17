@@ -670,7 +670,7 @@ async function openPipWindow() {
       height: 180
     });
     // Load pip.html into PiP window
-    const response = await fetch('pip.html');
+    const response = await fetch('pip.html?v=' + Date.now());
     const html = await response.text();
     pipWindow.document.write(html);
     pipWindow.document.close();
