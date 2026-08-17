@@ -120,7 +120,7 @@ const formatShortClock = (sec) => {
 
 // ================= State =================
 let appData = { entries: [], types: [] };
-let timerState = { running: false, startAt: null, taskType: '', content: '', interval: null };
+let timerState = { running: false, startAt: null, originalStartAt: null, elapsed: 0, taskType: '', content: '', interval: null };
 const isFloat = new URLSearchParams(window.location.search).has('float');
 
 // ================= Data Layer =================
@@ -303,11 +303,13 @@ function syncTimerFromStorage() {
   })();
   if (!pending) return;
 
-  // PiP started timer, main needs to catch up
+  // PiP/浮窗开始或继续计时，主窗口同步跟上
   if (pending.running && !timerState.running) {
     timerState = {
       running: true,
       startAt: pending.startAt,
+      originalStartAt: pending.originalStartAt || pending.startAt,
+      elapsed: pending.elapsed || 0,
       taskType: pending.taskType,
       content: pending.content,
       interval: setInterval(updateTimerUI, 1000)
@@ -316,57 +318,107 @@ function syncTimerFromStorage() {
     if (activeTimer) activeTimer.classList.remove('idle');
     const activeTask = document.getElementById('activeTask');
     if (activeTask) activeTask.textContent = pending.content || pending.taskType;
+    updateTimerUI();
   }
 
-  // PiP stopped timer, main needs to reset
+  // PiP/浮窗暂停或结束，主窗口同步停止
   if (!pending.running && timerState.running) {
+    const now = Date.now();
+    const session = Math.floor((now - timerState.startAt) / 1000);
     clearInterval(timerState.interval);
-    timerState = { running: false, startAt: null, taskType: '', content: '', interval: null };
+    timerState = {
+      running: false,
+      startAt: null,
+      originalStartAt: pending.originalStartAt || timerState.originalStartAt,
+      elapsed: (timerState.elapsed || 0) + session,
+      taskType: pending.taskType || timerState.taskType,
+      content: pending.content || timerState.content,
+      interval: null
+    };
     const activeTimer = document.getElementById('activeTimer');
     if (activeTimer) activeTimer.classList.add('idle');
-    const activeTask = document.getElementById('activeTask');
-    if (activeTask) activeTask.textContent = '未开始';
-    const activeTime = document.getElementById('activeTime');
-    if (activeTime) activeTime.textContent = '00:00:00';
-    renderToday();
+    updateTimerUI();
   }
 }
 
 function updateTimerUI() {
-  const sec = timerState.running ? Math.floor((Date.now() - timerState.startAt) / 1000) : 0;
+  const session = timerState.running ? Math.floor((Date.now() - timerState.startAt) / 1000) : 0;
+  const sec = (timerState.elapsed || 0) + session;
   const activeTime = document.getElementById('activeTime');
   if (activeTime) activeTime.textContent = formatClock(sec);
   const floatingTime = document.getElementById('floatingTime');
   if (floatingTime) floatingTime.textContent = formatClock(sec);
+  updateQuickStartLabel();
+  updateInlineFloatButtons();
 }
 
 async function startTimer(type, content) {
   if (timerState.running) return;
-  timerState = { running: true, startAt: Date.now(), taskType: type, content: content, interval: null };
+  const now = Date.now();
+  const isResume = (timerState.elapsed || 0) > 0;
+  timerState = {
+    running: true,
+    startAt: now,
+    originalStartAt: timerState.originalStartAt || now,
+    elapsed: timerState.elapsed || 0,
+    taskType: type || timerState.taskType,
+    content: content || timerState.content,
+    interval: null
+  };
   const activeTimer = document.getElementById('activeTimer');
   if (activeTimer) activeTimer.classList.remove('idle');
-  const floatingStart = document.getElementById('floatingStart');
-  const floatingStop = document.getElementById('floatingStop');
-  if (floatingStart) floatingStart.disabled = true;
-  if (floatingStop) floatingStop.disabled = false;
-  const floatingTask = document.getElementById('floatingTask');
-  if (floatingTask) floatingTask.textContent = content || type;
-  const floatingType = document.getElementById('floatingType');
-  if (floatingType) floatingType.textContent = type;
   const activeTask = document.getElementById('activeTask');
-  if (activeTask) activeTask.textContent = content || type;
+  if (activeTask) activeTask.textContent = timerState.content || timerState.taskType;
+  const floatingTask = document.getElementById('floatingTask');
+  if (floatingTask) floatingTask.textContent = timerState.content || timerState.taskType;
+  const floatingType = document.getElementById('floatingType');
+  if (floatingType) floatingType.textContent = timerState.taskType;
   updateTimerUI();
   timerState.interval = setInterval(updateTimerUI, 1000);
 
-  // 同步到 localStorage，让悬浮窗也能看到计时状态
   await invoke('save_timer_state', {
     state: {
       running: true,
       startAt: timerState.startAt,
+      originalStartAt: timerState.originalStartAt,
+      elapsed: timerState.elapsed,
+      taskType: timerState.taskType || appData.types[0] || '',
+      content: timerState.content || timerState.taskType || appData.types[0] || ''
+    }
+  });
+}
+
+async function pauseTimer() {
+  if (!timerState.running) return;
+  clearInterval(timerState.interval);
+  const session = Math.floor((Date.now() - timerState.startAt) / 1000);
+  timerState = {
+    running: false,
+    startAt: null,
+    originalStartAt: timerState.originalStartAt,
+    elapsed: (timerState.elapsed || 0) + session,
+    taskType: timerState.taskType,
+    content: timerState.content,
+    interval: null
+  };
+  const activeTimer = document.getElementById('activeTimer');
+  if (activeTimer) activeTimer.classList.add('idle');
+  updateTimerUI();
+
+  await invoke('save_timer_state', {
+    state: {
+      running: false,
+      startAt: null,
+      originalStartAt: timerState.originalStartAt,
+      elapsed: timerState.elapsed,
       taskType: timerState.taskType,
       content: timerState.content || timerState.taskType
     }
   });
+}
+
+async function resumeTimer() {
+  await startTimer(timerState.taskType, timerState.content);
 }
 
 async function applyPendingTimerState() {
@@ -386,16 +438,39 @@ async function applyPendingTimerState() {
     document.getElementById('note').value = pending.note || '';
     showPage('today');
 
-    // 回填后清空临时状态，防止重复填充
+    // 回填后清空临时状态并重置计时器显示
     await invoke('save_timer_state', { state: null });
+    timerState = { running: false, startAt: null, originalStartAt: null, elapsed: 0, taskType: '', content: '', interval: null };
+    const activeTimer = document.getElementById('activeTimer');
+    if (activeTimer) activeTimer.classList.add('idle');
+    const activeTask = document.getElementById('activeTask');
+    if (activeTask) activeTask.textContent = '未开始';
+    const activeTime = document.getElementById('activeTime');
+    if (activeTime) activeTime.textContent = '00:00:00';
+    const floatingTask = document.getElementById('floatingTask');
+    if (floatingTask) floatingTask.textContent = '未开始';
+    const floatingType = document.getElementById('floatingType');
+    if (floatingType) floatingType.textContent = '选择任务后点击开始';
+    const floatingTime = document.getElementById('floatingTime');
+    if (floatingTime) floatingTime.textContent = '00:00:00';
+    updateQuickStartLabel();
+    updateInlineFloatButtons();
   } catch (e) { console.error('get_timer_state failed', e); }
 }
 
 async function stopTimer() {
-  if (!timerState.running) return;
-  clearInterval(timerState.interval);
+  const wasRunning = timerState.running;
+  const hasTime = (timerState.elapsed || 0) > 0 || timerState.running;
+  if (!hasTime) return;
+
+  if (timerState.interval) clearInterval(timerState.interval);
+
+  const now = Date.now();
+  const session = wasRunning ? Math.floor((now - timerState.startAt) / 1000) : 0;
+  const totalElapsed = (timerState.elapsed || 0) + session;
   const endAt = new Date();
-  const startAt = new Date(timerState.startAt);
+  const rawStart = timerState.originalStartAt || (now - totalElapsed * 1000);
+  const startAt = new Date(rawStart);
   const pad = n => String(n).padStart(2,'0');
   const startTime = `${pad(startAt.getHours())}:${pad(startAt.getMinutes())}`;
   const endTime = `${pad(endAt.getHours())}:${pad(endAt.getMinutes())}`;
@@ -407,17 +482,18 @@ async function stopTimer() {
       content: timerState.content || timerState.taskType,
       startTime,
       endTime,
+      elapsed: totalElapsed,
       nature: '常规',
       note: ''
     }
   });
 
-  // If stopped from main window, immediately fill the form
+  // 主窗口结束计时时立即回填表单
   if (!isFloat) {
     await applyPendingTimerState();
   }
 
-  timerState = { running: false, startAt: null, taskType: '', content: '', interval: null };
+  timerState = { running: false, startAt: null, originalStartAt: null, elapsed: 0, taskType: '', content: '', interval: null };
   const activeTimer = document.getElementById('activeTimer');
   if (activeTimer) activeTimer.classList.add('idle');
   const activeTask = document.getElementById('activeTask');
@@ -430,16 +506,38 @@ async function stopTimer() {
   if (floatingType) floatingType.textContent = '选择任务后点击开始';
   const floatingTime = document.getElementById('floatingTime');
   if (floatingTime) floatingTime.textContent = '00:00:00';
-  const floatingStart = document.getElementById('floatingStart');
-  const floatingStop = document.getElementById('floatingStop');
-  if (floatingStart) floatingStart.disabled = false;
-  if (floatingStop) floatingStop.disabled = true;
+  updateQuickStartLabel();
+  updateInlineFloatButtons();
+}
+
+function updateQuickStartLabel() {
+  const btn = document.getElementById('quickStartBtn');
+  if (!btn) return;
+  if (timerState.running) {
+    btn.textContent = '结束计时';
+  } else if ((timerState.elapsed || 0) > 0) {
+    btn.textContent = '继续计时';
+  } else {
+    btn.textContent = '开始计时';
+  }
+}
+
+function updateInlineFloatButtons() {
+  const startBtn = document.getElementById('floatingStart');
+  const startText = document.getElementById('floatingStartText');
+  const stopBtn = document.getElementById('floatingStop');
+  const pauseBtn = document.getElementById('floatingPause');
+  if (startBtn) startBtn.disabled = timerState.running;
+  if (startText) startText.textContent = (timerState.elapsed || 0) > 0 ? '继续' : '开始';
+  if (stopBtn) stopBtn.disabled = !timerState.running && !(timerState.elapsed || 0);
+  if (pauseBtn) pauseBtn.disabled = !timerState.running;
 }
 
 document.getElementById('quickStartBtn')?.addEventListener('click', () => {
   const type = document.getElementById('taskType').value;
   const content = document.getElementById('content').value.trim();
   if (timerState.running) { stopTimer(); return; }
+  if ((timerState.elapsed || 0) > 0) { resumeTimer(); return; }
   startTimer(type, content);
 });
 
@@ -694,6 +792,18 @@ async function init() {
     btn.addEventListener('click', () => showPage(btn.dataset.page));
   });
 
+  // 内联悬浮面板按钮
+  document.getElementById('floatingStart')?.addEventListener('click', () => {
+    if (timerState.running) return;
+    if ((timerState.elapsed || 0) > 0) { resumeTimer(); return; }
+    const type = document.getElementById('taskType')?.value || '';
+    const content = document.getElementById('content')?.value.trim() || '';
+    startTimer(type, content);
+  });
+  document.getElementById('floatingPause')?.addEventListener('click', pauseTimer);
+  document.getElementById('floatingStop')?.addEventListener('click', stopTimer);
+  document.getElementById('floatCloseBtn')?.addEventListener('click', hideInlineFloat);
+
   const taskTypeSelect = document.getElementById('taskType');
   const inlineTypeInput = document.getElementById('inlineTypeInput');
   document.getElementById('addTypeInlineBtn').addEventListener('click', () => {
@@ -729,8 +839,12 @@ async function init() {
   renderTypeSelect();
   renderToday();
 
+  syncTimerFromStorage();
   await applyPendingTimerState();
-  window.addEventListener('focus', applyPendingTimerState);
+  window.addEventListener('focus', () => {
+    syncTimerFromStorage();
+    applyPendingTimerState();
+  });
 
   // Sync timer state from PiP / other tabs
   setInterval(syncTimerFromStorage, 1000);
