@@ -6,108 +6,226 @@
   <title>刻间计时器</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --text-secondary: #64748b;
+      --border: #e2e8f0;
+      --primary: #059669;
+      --primary-hover: #047857;
+      --warning: #f59e0b;
+      --warning-hover: #d97706;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --info: #3b82f6;
+      --info-hover: #2563eb;
+      --radius: 10px;
+      --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+    }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background: #ffffff;
-      color: #1f2937;
+      background: var(--bg);
+      color: var(--text);
       padding: 12px;
-      min-width: 240px;
+      min-width: 230px;
       user-select: none;
     }
-    .pip-app { display: flex; flex-direction: column; gap: 10px; }
-    .pip-header {
-      display: flex; align-items: center; justify-content: space-between;
-      font-size: 13px; font-weight: 600; color: #111827;
+    .pip-app {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
-    .pip-close {
-      background: none; border: none; font-size: 18px; color: #9ca3af;
-      cursor: pointer; line-height: 1; padding: 0 2px;
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
-    .pip-close:hover { color: #374151; }
-    .pip-field { display: flex; flex-direction: column; gap: 4px; }
-    .pip-field label { font-size: 11px; color: #6b7280; font-weight: 500; }
-    .pip-field input, .pip-field select {
-      border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 8px;
-      font-size: 13px; background: #fff; color: #1f2937; outline: none;
+    .title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      letter-spacing: 0.02em;
     }
-    .pip-field input:focus, .pip-field select:focus { border-color: #059669; }
-    .pip-row { display: flex; gap: 6px; align-items: center; }
-    .pip-row > * { flex: 1; }
-    .pip-row .pip-icon-btn { flex: 0 0 32px; }
-    .pip-icon-btn {
-      border: 1px solid #e5e7eb; background: #fff; border-radius: 6px;
-      height: 32px; font-size: 18px; color: #059669; cursor: pointer;
+    .close {
+      background: none;
+      border: none;
+      font-size: 18px;
+      color: #94a3b8;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0 2px;
     }
-    .pip-icon-btn:hover { background: #f0fdf4; }
-    .pip-btn-sm {
-      border: none; background: #059669; color: #fff; border-radius: 6px;
-      padding: 6px 10px; font-size: 12px; cursor: pointer;
+    .close:hover { color: #475569; }
+
+    .task-section { display: flex; flex-direction: column; gap: 6px; }
+    .field-row { display: flex; gap: 6px; align-items: center; }
+    .field-row > * { flex: 1; }
+    .field-row .icon-btn { flex: 0 0 32px; }
+    select, input[type="text"], input[type="number"] {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 9px;
+      font-size: 13px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
     }
-    .hidden { display: none !important; }
-    .pip-time {
-      font-size: 34px; font-weight: 700; text-align: center;
-      font-variant-numeric: tabular-nums; color: #111827;
+    select:focus, input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(5,150,105,0.08); }
+    select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; padding-right: 24px; }
+    .icon-btn {
+      flex: 0 0 32px;
+      width: 32px; height: 32px;
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 8px;
+      font-size: 18px;
+      color: var(--primary);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .icon-btn:hover { background: #f0fdf4; }
+    .new-type-row { display: flex; gap: 6px; }
+    .new-type-row input { flex: 1; }
+    .new-type-row button {
+      border: none; background: var(--primary); color: #fff;
+      border-radius: 8px; padding: 0 12px; font-size: 12px; cursor: pointer;
+    }
+    .new-type-row button:hover { background: var(--primary-hover); }
+
+    .timer-section {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 6px 0 2px;
+    }
+    .time {
+      font-size: 40px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      padding: 4px 0;
+      color: var(--text);
+      line-height: 1.1;
+      letter-spacing: -0.02em;
     }
-    .pip-time.running { color: #059669; }
-    .pip-status { font-size: 11px; text-align: center; color: #9ca3af; }
-    .pip-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-    .pip-btn {
-      border: none; border-radius: 6px; padding: 8px 0; font-size: 12px;
-      font-weight: 500; cursor: pointer; color: #fff;
+    .time.running { color: var(--primary); }
+    .time.paused { color: var(--warning); }
+    .status {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+      font-weight: 500;
     }
-    .pip-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .pip-btn-start { background: #059669; }
-    .pip-btn-pause { background: #f59e0b; }
-    .pip-btn-stop { background: #ef4444; }
-    .pip-btn-save { background: #3b82f6; grid-column: span 2; }
-    .pip-meta { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #f3f4f6; padding-top: 8px; }
-    .pip-inline { display: flex; gap: 6px; align-items: center; }
-    .pip-inline label { white-space: nowrap; }
-    .pip-inline input[type="number"] { width: 60px; flex: 0 0 60px; }
-    .pip-inline select { flex: 1; }
-    .pip-radio { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #374151; cursor: pointer; }
-    .pip-radio input { accent-color: #059669; }
+
+    .actions { display: flex; flex-direction: column; gap: 6px; }
+    .btn {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 0;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform .08s, background .15s;
+      color: #fff;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-primary { background: var(--primary); }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+    .btn-primary.warning { background: var(--warning); }
+    .btn-primary.warning:hover:not(:disabled) { background: var(--warning-hover); }
+    .btn-primary.info { background: var(--info); }
+    .btn-primary.info:hover:not(:disabled) { background: var(--info-hover); }
+    .btn-secondary {
+      background: #fff;
+      color: var(--danger);
+      border: 1px solid #fecaca;
+    }
+    .btn-secondary:hover:not(:disabled) { background: #fef2f2; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 12px;
+      padding: 6px 0;
+      font-weight: 500;
+    }
+    .btn-ghost:hover:not(:disabled) { color: var(--text); }
+
+    .details {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+      animation: slideDown .2s ease-out;
+    }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .details .field-row { align-items: center; }
+    .details label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .details input[type="number"] { flex: 0 0 60px; }
+    .details select { flex: 1; }
+    .nature-row {
+      display: flex;
+      gap: 12px;
+      padding: 2px 0;
+    }
+    .nature-row label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 13px;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .nature-row input { accent-color: var(--primary); }
+
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
   <div class="pip-app">
-    <div class="pip-header">
-      <span>刻间计时器 · 悬浮窗</span>
-      <button class="pip-close" id="pipClose" title="关闭">×</button>
-    </div>
+    <header>
+      <span class="title">刻间计时器 · 悬浮窗</span>
+      <button class="close" id="pipClose" title="关闭">×</button>
+    </header>
 
-    <div class="pip-field">
-      <label>任务类型</label>
-      <div class="pip-row">
+    <section class="task-section">
+      <div class="field-row">
         <select id="pipTypeSelect"></select>
-        <button class="pip-icon-btn" id="pipAddTypeBtn" title="新增类型">+</button>
+        <button class="icon-btn" id="pipAddTypeBtn" title="新增类型">+</button>
       </div>
-      <div class="pip-row hidden" id="pipNewTypeRow">
+      <div class="new-type-row hidden" id="pipNewTypeRow">
         <input id="pipNewType" placeholder="输入新类型" />
-        <button class="pip-btn-sm" id="pipConfirmType">添加</button>
+        <button id="pipConfirmType">添加</button>
       </div>
-    </div>
+      <input id="pipContent" type="text" placeholder="任务内容，如：订单导出" />
+    </section>
 
-    <div class="pip-field">
-      <label>任务内容</label>
-      <input id="pipContent" placeholder="如：订单导出" />
-    </div>
+    <section class="timer-section">
+      <div class="time" id="pipTime">00:00:00</div>
+      <div class="status" id="pipStatus">就绪</div>
+    </section>
 
-    <div class="pip-time" id="pipTime">00:00:00</div>
-    <div class="pip-status" id="pipStatus">就绪</div>
+    <section class="actions" id="pipActions">
+      <button class="btn btn-primary" id="pipPrimary">开始计时</button>
+      <button class="btn btn-secondary hidden" id="pipSecondary">结束</button>
+      <button class="btn btn-ghost hidden" id="pipReset">取消</button>
+    </section>
 
-    <div class="pip-actions">
-      <button class="pip-btn pip-btn-start" id="pipStart">开始</button>
-      <button class="pip-btn pip-btn-pause" id="pipPause" disabled>暂停</button>
-      <button class="pip-btn pip-btn-stop" id="pipStop" disabled>结束</button>
-      <button class="pip-btn pip-btn-save" id="pipSave" disabled>保存记录</button>
-    </div>
-
-    <div class="pip-meta">
-      <div class="pip-field pip-inline">
-        <label>处理数量</label>
+    <section class="details hidden" id="pipDetails">
+      <div class="field-row">
+        <label>数量</label>
         <input id="pipQuantity" type="number" min="0" placeholder="0" />
         <select id="pipUnit">
           <option value="条">条</option>
@@ -118,16 +236,12 @@
           <option value="次">次</option>
         </select>
       </div>
-      <div class="pip-field pip-inline">
-        <label>任务属性</label>
-        <label class="pip-radio"><input type="radio" name="pipNature" value="常规" checked> 常规</label>
-        <label class="pip-radio"><input type="radio" name="pipNature" value="突发"> 突发</label>
+      <div class="nature-row">
+        <label><input type="radio" name="pipNature" value="常规" checked> 常规</label>
+        <label><input type="radio" name="pipNature" value="突发"> 突发</label>
       </div>
-      <div class="pip-field">
-        <label>备注（系统问题、外部等待等）</label>
-        <input id="pipNote" placeholder="选填" />
-      </div>
-    </div>
+      <input id="pipNote" type="text" placeholder="备注：系统问题、外部等待等" />
+    </section>
   </div>
 
   <script>
@@ -144,9 +258,7 @@
     function setTimerState(state) { setLS(TIMER_STATE_KEY, state); broadcast('timer-state-updated'); }
     function getFloatTask() { return getLS(FLOAT_TASK_KEY) || { taskType: '', content: '' }; }
     function setFloatTask(task) { setLS(FLOAT_TASK_KEY, task); }
-    function broadcast(type) {
-      try { const bc = new BroadcastChannel('kejian-timer'); bc.postMessage({ type }); bc.close(); } catch {}
-    }
+    function broadcast(type) { try { const bc = new BroadcastChannel('kejian-timer'); bc.postMessage({ type }); bc.close(); } catch {} }
     function formatClock(sec) {
       const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
       return [h,m,s].map(x => String(x).padStart(2,'0')).join(':');
@@ -165,10 +277,10 @@
       content: document.getElementById('pipContent'),
       time: document.getElementById('pipTime'),
       status: document.getElementById('pipStatus'),
-      startBtn: document.getElementById('pipStart'),
-      pauseBtn: document.getElementById('pipPause'),
-      stopBtn: document.getElementById('pipStop'),
-      saveBtn: document.getElementById('pipSave'),
+      primary: document.getElementById('pipPrimary'),
+      secondary: document.getElementById('pipSecondary'),
+      reset: document.getElementById('pipReset'),
+      details: document.getElementById('pipDetails'),
       quantity: document.getElementById('pipQuantity'),
       unit: document.getElementById('pipUnit'),
       note: document.getElementById('pipNote'),
@@ -181,13 +293,63 @@
       appData.types.forEach(t => {
         const opt = document.createElement('option'); opt.value = t; opt.textContent = t; els.typeSelect.appendChild(opt);
       });
-      const addOpt = document.createElement('option'); addOpt.value = '__add_new__'; addOpt.textContent = '➕ 新增类型...'; els.typeSelect.appendChild(addOpt);
+      const addOpt = document.createElement('option'); addOpt.value = '__add_new__'; addOpt.textContent = '+ 新增类型'; els.typeSelect.appendChild(addOpt);
       const preferred = floatTask.taskType && appData.types.includes(floatTask.taskType) ? floatTask.taskType : appData.types[0];
       els.typeSelect.value = appData.types.includes(current) ? current : preferred;
     }
 
-    function getNature() {
-      return document.querySelector('input[name="pipNature"]:checked')?.value || '常规';
+    function getNature() { return document.querySelector('input[name="pipNature"]:checked')?.value || '常规'; }
+
+    function getMode() {
+      const state = getTimerState();
+      if (!state) return 'idle';
+      if (state.running) return 'running';
+      if (state.startTime && state.endTime) return 'stopped';
+      if ((state.elapsed || 0) > 0) return 'paused';
+      return 'idle';
+    }
+
+    function setMode(mode) {
+      const state = getTimerState();
+      const running = mode === 'running';
+      const paused = mode === 'paused';
+      const stopped = mode === 'stopped';
+
+      els.time.classList.toggle('running', running);
+      els.time.classList.toggle('paused', paused);
+
+      els.primary.className = 'btn btn-primary';
+      els.secondary.classList.remove('hidden');
+      els.reset.classList.add('hidden');
+
+      if (mode === 'idle') {
+        els.primary.textContent = '开始计时';
+        els.secondary.classList.add('hidden');
+        els.status.textContent = '就绪';
+      } else if (mode === 'running') {
+        els.primary.textContent = '暂停';
+        els.primary.classList.add('warning');
+        els.secondary.textContent = '结束';
+        els.status.textContent = '计时中';
+      } else if (mode === 'paused') {
+        els.primary.textContent = '继续';
+        els.secondary.textContent = '结束';
+        els.status.textContent = '已暂停';
+      } else if (mode === 'stopped') {
+        els.primary.textContent = '保存记录';
+        els.primary.classList.add('info');
+        els.secondary.classList.add('hidden');
+        els.reset.classList.remove('hidden');
+        els.status.textContent = '补全信息后保存';
+      }
+
+      if (stopped) {
+        const wasHidden = els.details.classList.contains('hidden');
+        els.details.classList.remove('hidden');
+        if (wasHidden && !els.quantity.value) els.quantity.value = '1';
+      } else {
+        els.details.classList.add('hidden');
+      }
     }
 
     function updateDisplay() {
@@ -195,29 +357,14 @@
       const session = state && state.running ? Math.floor((Date.now() - state.startAt) / 1000) : 0;
       const sec = (state ? state.elapsed || 0 : 0) + session;
       els.time.textContent = formatClock(sec);
-      els.time.classList.toggle('running', !!(state && state.running));
 
-      let statusText = '就绪';
-      if (state && state.running) statusText = '计时中';
-      else if (state && state.startTime && state.endTime) statusText = '待保存';
-      else if (state && (state.elapsed || 0) > 0) statusText = '已暂停';
-      els.status.textContent = statusText;
-
-      const running = !!(state && state.running);
-      const elapsed = state ? state.elapsed || 0 : 0;
-      const hasResult = !!(state && state.startTime && state.endTime);
-      const hasTime = running || elapsed > 0;
-
-      els.startBtn.disabled = running;
-      els.startBtn.textContent = elapsed > 0 ? '继续' : '开始';
-      els.pauseBtn.disabled = !running;
-      els.stopBtn.disabled = !hasTime;
-      els.saveBtn.disabled = !hasResult;
+      const mode = getMode();
+      setMode(mode);
 
       if (state && state.taskType && appData.types.includes(state.taskType) && !els.typeSelect.matches(':focus')) {
         els.typeSelect.value = state.taskType;
       }
-      if (state && state.content && !els.content.matches(':focus')) {
+      if (state && state.content !== undefined && !els.content.matches(':focus')) {
         els.content.value = state.content;
       }
     }
@@ -258,6 +405,8 @@
       updateDisplay();
     }
 
+    function resumeTimer() { startTimer(); }
+
     function stopTimer() {
       const state = getTimerState();
       if (!state) return;
@@ -282,6 +431,14 @@
         endTime: fmt(endAt)
       });
       setFloatTask({ taskType, content });
+      updateDisplay();
+    }
+
+    function resetTimer() {
+      setTimerState(null);
+      els.content.value = '';
+      els.quantity.value = '';
+      els.note.value = '';
       updateDisplay();
     }
 
@@ -323,16 +480,23 @@
       }
       renderTypes();
       els.typeSelect.value = v;
+      syncTaskToState();
       updateDisplay();
+    }
+
+    function handlePrimary() {
+      const mode = getMode();
+      if (mode === 'idle' || mode === 'paused') startTimer();
+      else if (mode === 'running') pauseTimer();
+      else if (mode === 'stopped') saveEntry();
     }
 
     renderTypes();
     if (floatTask.content) els.content.value = floatTask.content;
 
-    els.startBtn.addEventListener('click', startTimer);
-    els.pauseBtn.addEventListener('click', pauseTimer);
-    els.stopBtn.addEventListener('click', stopTimer);
-    els.saveBtn.addEventListener('click', saveEntry);
+    els.primary.addEventListener('click', handlePrimary);
+    els.secondary.addEventListener('click', stopTimer);
+    els.reset.addEventListener('click', resetTimer);
     els.addTypeBtn.addEventListener('click', () => { els.newTypeRow.classList.remove('hidden'); els.newType.focus(); });
     els.confirmType.addEventListener('click', addNewType);
     els.newType.addEventListener('keydown', (e) => { if (e.key === 'Enter') addNewType(); });
