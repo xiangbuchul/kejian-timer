@@ -126,12 +126,18 @@ const isFloat = new URLSearchParams(window.location.search).has('float');
 // ================= Data Layer =================
 async function loadData() {
   try {
-    appData = await invoke('load_data');
+    const raw = await invoke('load_data');
+    appData = {
+      ...defaultData,
+      ...raw,
+      entries: Array.isArray(raw.entries) ? raw.entries : [],
+      types: Array.isArray(raw.types) && raw.types.length ? raw.types : defaultData.types,
+      settings: { ...defaultData.settings, ...(raw.settings || {}) }
+    };
   } catch (e) {
     console.error('load_data failed', e);
-    appData = { entries: [], types: ['订单导出','邮件回复','制单发货','评论回复','文档整理'], settings: { edgeDock: false } };
+    appData = JSON.parse(JSON.stringify(defaultData));
   }
-  appData.settings = appData.settings || { edgeDock: false };
 }
 
 async function saveData() {
@@ -890,19 +896,29 @@ async function init() {
 
   // Sync timer state from PiP / other tabs
   setInterval(syncTimerFromStorage, 1000);
-  window.addEventListener('storage', (e) => {
+  window.addEventListener('storage', async (e) => {
     if (e.key === TIMER_STATE_KEY) syncTimerFromStorage();
-    if (e.key === STORAGE_KEY) renderToday();
+    if (e.key === STORAGE_KEY) {
+      await loadData();
+      renderTypeSelect();
+      renderToday();
+      renderTypes();
+    }
   });
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel('kejian-timer');
-      bc.onmessage = (ev) => {
+      bc.onmessage = async (ev) => {
         if (ev.data && ev.data.type === 'timer-state-updated') {
           syncTimerFromStorage();
           applyPendingTimerState();
         }
-        if (ev.data && ev.data.type === 'data-updated') renderToday();
+        if (ev.data && ev.data.type === 'data-updated') {
+          await loadData();
+          renderTypeSelect();
+          renderToday();
+          renderTypes();
+        }
       };
     }
   } catch (e) {}
