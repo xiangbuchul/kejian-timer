@@ -339,6 +339,22 @@ function syncTimerFromStorage() {
     if (activeTimer) activeTimer.classList.add('idle');
     updateTimerUI();
   }
+
+  // 主窗口打开时，浮窗已处于暂停状态
+  if (!pending.running && !timerState.running && (pending.elapsed || 0) > 0 && !pending.startTime && !pending.endTime) {
+    timerState = {
+      running: false,
+      startAt: null,
+      originalStartAt: pending.originalStartAt,
+      elapsed: pending.elapsed,
+      taskType: pending.taskType,
+      content: pending.content,
+      interval: null
+    };
+    const activeTask = document.getElementById('activeTask');
+    if (activeTask) activeTask.textContent = pending.content || pending.taskType;
+    updateTimerUI();
+  }
 }
 
 function updateTimerUI() {
