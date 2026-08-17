@@ -288,11 +288,31 @@ document.getElementById('entryForm')?.addEventListener('submit', async (e) => {
     appData.entries.push(entry);
   }
   await saveData();
+  await invoke('save_timer_state', { state: null });
   resetForm();
   renderToday();
 });
 
 // ================= Timer =================
+
+function resetTimerUI() {
+  clearInterval(timerState.interval);
+  timerState = { running: false, startAt: null, originalStartAt: null, elapsed: 0, taskType: '', content: '', interval: null };
+  const activeTimer = document.getElementById('activeTimer');
+  if (activeTimer) activeTimer.classList.add('idle');
+  const activeTask = document.getElementById('activeTask');
+  if (activeTask) activeTask.textContent = '未开始';
+  const activeTime = document.getElementById('activeTime');
+  if (activeTime) activeTime.textContent = '00:00:00';
+  const floatingTask = document.getElementById('floatingTask');
+  if (floatingTask) floatingTask.textContent = '未开始';
+  const floatingType = document.getElementById('floatingType');
+  if (floatingType) floatingType.textContent = '选择任务后点击开始';
+  const floatingTime = document.getElementById('floatingTime');
+  if (floatingTime) floatingTime.textContent = '00:00:00';
+  updateQuickStartLabel();
+  updateInlineFloatButtons();
+}
 
 function syncTimerFromStorage() {
   const pending = (() => {
@@ -301,7 +321,12 @@ function syncTimerFromStorage() {
       return raw ? JSON.parse(raw) : null;
     } catch { return null; }
   })();
-  if (!pending) return;
+  if (!pending) {
+    if (timerState.running || (timerState.elapsed || 0) > 0 || timerState.startAt) {
+      resetTimerUI();
+    }
+    return;
+  }
 
   // PiP/浮窗开始或继续计时，主窗口同步跟上
   if (pending.running && !timerState.running) {
@@ -440,8 +465,8 @@ async function resumeTimer() {
 async function applyPendingTimerState() {
   try {
     const pending = await invoke('get_timer_state');
-    // 只处理已结束且带起止时间的临时计时结果，避免覆盖正在运行的状态
-    if (!pending || pending.running || !pending.startTime || !pending.endTime) return;
+    // 只处理已结束、带起止时间且尚未回填过的临时计时结果
+    if (!pending || pending.running || !pending.startTime || !pending.endTime || pending.applied) return;
 
     document.getElementById('taskType').value = pending.taskType || appData.types[0] || '';
     document.getElementById('content').value = pending.content || '';
@@ -454,8 +479,8 @@ async function applyPendingTimerState() {
     document.getElementById('note').value = pending.note || '';
     showPage('today');
 
-    // 回填后清空临时状态并重置计时器显示
-    await invoke('save_timer_state', { state: null });
+    // 标记已回填，但保留状态给悬浮窗保存；重置计时器显示
+    await invoke('save_timer_state', { state: { ...pending, applied: true } });
     timerState = { running: false, startAt: null, originalStartAt: null, elapsed: 0, taskType: '', content: '', interval: null };
     const activeTimer = document.getElementById('activeTimer');
     if (activeTimer) activeTimer.classList.add('idle');
@@ -494,6 +519,7 @@ async function stopTimer() {
   await invoke('save_timer_state', {
     state: {
       running: false,
+      applied: false,
       taskType: timerState.taskType,
       content: timerState.content || timerState.taskType,
       startTime,
